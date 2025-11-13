@@ -1,7 +1,19 @@
+
+/*
+██╗███╗   ██╗ ██████╗██╗     ██╗   ██╗██████╗ ███████╗
+██║████╗  ██║██╔════╝██║     ██║   ██║██╔══██╗██╔════╝
+██║██╔██╗ ██║██║     ██║     ██║   ██║██║  ██║█████╗  
+██║██║╚██╗██║██║     ██║     ██║   ██║██║  ██║██╔══╝  
+██║██║ ╚████║╚██████╗███████╗╚██████╔╝██████╔╝███████╗
+╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝
+                                                      
+*/
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 #include "lemlib/chassis/chassis.hpp"
 //#include "pros/adi.hpp"
+#include "pros/abstract_motor.hpp"
+#include "pros/adi.hpp"
 #include "pros/imu.hpp"
 #include "pros/llemu.hpp"
 #include "pros/misc.h"
@@ -9,39 +21,63 @@
 #include "pros/optical.hpp"
 #include "pros/rtos.hpp"
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
+
+
+/*
+██████╗ ███████╗ ██████╗██╗      █████╗ ██████╗ ███████╗
+██╔══██╗██╔════╝██╔════╝██║     ██╔══██╗██╔══██╗██╔════╝
+██║  ██║█████╗  ██║     ██║     ███████║██████╔╝█████╗  
+██║  ██║██╔══╝  ██║     ██║     ██╔══██║██╔══██╗██╔══╝  
+██████╔╝███████╗╚██████╗███████╗██║  ██║██║  ██║███████╗
+╚═════╝ ╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
+
+*/
 
 // controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // motor groups
-pros::MotorGroup leftMotors({-3, -4, -5},
+pros::MotorGroup leftMotors({-17, -18, -20},
                             pros::MotorGearset::blue); // left motor group - ports 3 (reversed), 4, 5 (reversed)
-pros::MotorGroup rightMotors({10, 9, 8}, 
+pros::MotorGroup rightMotors({16, 15, 14}, 
                             pros::MotorGearset::blue); // right motor group - ports 6, 7, 9 (reversed)
 
-//pros::Motor intake(-11, pros::MotorGearset::blue);
 
-pros::Motor intake1(11, pros::MotorGearset::blue);
-pros::Motor intake2(7, pros::MotorGearset::blue);
+pros::Motor intake1(10, pros::MotorGearset::blue);
+pros::Motor intake2(12, pros::MotorGearset::blue);
 
 pros::Motor yMotor(9, pros::MotorGearset::blue);
 
 // Inertial Sensor on port 10
-pros::Imu imu(20);
+pros::Imu imu(19);
 
 // Optical Sensor on port 6
-pros::Optical detector(6);
-
+pros::Optical detector(13);
 pros::ADIDigitalOut height('B');
-pros::ADIDigitalOut doinker('A');
-pros::ADIDigitalOut pod('C');
+pros::ADIDigitalOut doinker('C');
+pros::ADIDigitalOut pod('D');
+pros::ADIDigitalOut wing('A');
+pros::ADIDigitalOut dblPark('E');
 //pros::ADIButton selector('D');
 
+
+/*
+██████╗  █████╗ ███████╗██╗ ██████╗    ███████╗██╗  ██╗███╗   ██╗
+██╔══██╗██╔══██╗██╔════╝██║██╔════╝    ██╔════╝╚██╗██╔╝████╗  ██║
+██████╔╝███████║███████╗██║██║         █████╗   ╚███╔╝ ██╔██╗ ██║
+██╔══██╗██╔══██║╚════██║██║██║         ██╔══╝   ██╔██╗ ██║╚██╗██║
+██████╔╝██║  ██║███████║██║╚██████╗    ██║     ██╔╝ ██╗██║ ╚████║
+╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝    ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝
+                                                
+*/
 
 bool heightState = false;
 bool doinkerState = false;
 bool podState = false;
+bool wingState = false;
+bool parkState = false;
 
 void toggleHeight() {
     heightState = !heightState;  // Toggle state
@@ -61,9 +97,26 @@ void togglePod() {
     pros::delay(10);
 }
 
+void toggleWings() {
+    wingState = !wingState;
+    wing.set_value(wingState);
+    pros::delay(10);
+}
+
+void togglePark() {
+    parkState = !parkState;
+    dblPark.set_value(parkState);
+    pros::delay(10);
+}
+
 void intaking(double speed) {
     intake1.move(speed);
-    intake2.move(-speed);
+    intake2.move(-speed*0.80);
+}
+
+void intakingStore(double speed) {
+    intake1.move(speed);
+    intake2.move(speed*0.5);
 }
 
 void intakeStop() {
@@ -73,11 +126,19 @@ void intakeStop() {
     intake2.brake();
 }
 
-
+/*
+██████╗ ██████╗ ██╗██╗   ██╗███████╗    ██████╗ ███████╗ ██████╗██╗      █████╗ ██████╗ ███████╗
+██╔══██╗██╔══██╗██║██║   ██║██╔════╝    ██╔══██╗██╔════╝██╔════╝██║     ██╔══██╗██╔══██╗██╔════╝
+██║  ██║██████╔╝██║██║   ██║█████╗      ██║  ██║█████╗  ██║     ██║     ███████║██████╔╝█████╗  
+██║  ██║██╔══██╗██║╚██╗ ██╔╝██╔══╝      ██║  ██║██╔══╝  ██║     ██║     ██╔══██║██╔══██╗██╔══╝  
+██████╔╝██║  ██║██║ ╚████╔╝ ███████╗    ██████╔╝███████╗╚██████╗███████╗██║  ██║██║  ██║███████╗
+╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝    ╚═════╝ ╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
+                                                                                                
+*/
 
 // tracking wheels
 // horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
-pros::Rotation horizontalEnc(6);
+pros::Rotation horizontalEnc(11);
 // vertical tracking wheel encoder
 //pros::Rotation verticalEnc(-11);
 // horizontal tracking wheel. 2.75" diameter, 5.75" offset, back of the robot (negative)
@@ -97,32 +158,28 @@ lemlib::Drivetrain drivetrain(&leftMotors, // left motor group
 );
 
 // lateral motion controller
-lemlib::ControllerSettings linearController(12, // proportional gain (kP)
+lemlib::ControllerSettings linearController(8, // proportional gain (kP)
                                             0, // integral gain (kI)
-                                            9, // derivative gain (kD)
+                                            27, // derivative gain (kD)
                                             3, // anti windup (3)
-                                            0.5, // small error range, in inches (0.5)
+                                            0, // small error range, in inches (0.5)
                                             100, // small error range timeout, in milliseconds (100)
-                                            1, // large error range, in inches (1)
+                                            0.3, // large error range, in inches (1)
                                             500, // large error range timeout, in milliseconds (500)
-                                            20 // maximum acceleration (slew) (20)
+                                            0 // maximum acceleration (slew) (20)
 );
 
 // angular motion controller
-lemlib::ControllerSettings angularController(4, // proportional gain (kP)
-                                             0.02, // integral gain (kI)
-                                             46, // derivative gain (kD)
-                                             3, // anti windup (3)
-                                             0.2, // small error range, in degrees (0.2)
+lemlib::ControllerSettings angularController(4, // proportional gain (kP) 4
+                                             0.2, // integral gain (kI) 0.02
+                                             46, // derivative gain (kD) 46
+                                             2, // anti windup (3)
+                                             0, // small error range, in degrees (0.2)
                                              100, // small error range timeout, in milliseconds (100)
-                                             0.7, // large error range, in degrees (0.7)
+                                             0.5, // large error range, in degrees (0.7)
                                              500, // large error range timeout, in milliseconds (500)
-                                             20 // maximum acceleration (slew) (20)
+                                             0 // maximum acceleration (slew) (20)
 );
-
-// 4 - 26
-// 3 - 20
-// 2 - 20
 
 // sensors for odometry
 lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel
@@ -147,6 +204,15 @@ lemlib::ExpoDriveCurve steerCurve(0, // joystick deadband out of 127
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
+/*
+ █████╗ ██╗   ██╗████████╗ ██████╗ ███╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ██╗   ██╗███████╗
+██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗████╗  ██║██╔═══██╗████╗ ████║██╔═══██╗██║   ██║██╔════╝
+███████║██║   ██║   ██║   ██║   ██║██╔██╗ ██║██║   ██║██╔████╔██║██║   ██║██║   ██║███████╗
+██╔══██║██║   ██║   ██║   ██║   ██║██║╚██╗██║██║   ██║██║╚██╔╝██║██║   ██║██║   ██║╚════██║
+██║  ██║╚██████╔╝   ██║   ╚██████╔╝██║ ╚████║╚██████╔╝██║ ╚═╝ ██║╚██████╔╝╚██████╔╝███████║
+╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝
+                                                                                           
+*/
 
 void midLow(double side) {
 
@@ -326,13 +392,102 @@ void nineBlocksL() {
     intaking(127);
 }
 
+void eightBlockM() {
+    intakingStore(127);
+    chassis.turnToPoint(2, 10, 100);
+    chassis.moveToPoint(2, 10, 500);
+    chassis.turnToPoint(-6, 29, 100); 
+    chassis.moveToPoint(-6, 29, 1000, {.maxSpeed = 50});
+    pros::delay(10);
+    chassis.turnToPoint(-19, 41, 500);
+    chassis.moveToPoint(-19, 41, 500);
+    chassis.turnToHeading(-70, 1000);
+    pros::delay(50);
+    toggleDoinker();
+    chassis.moveToPoint(-6, 28, 500, {.forwards = false});
+    chassis.turnToHeading(0, 500);
+    chassis.moveToPoint(-6, 15, 500, {.forwards = false});
+    chassis.turnToPoint(-30, 15, 500);
+    chassis.moveToPoint(-30, 15, 500);
+    chassis.turnToHeading(180, 500);
+    chassis.moveToPoint(-31, 31, 1000, {.forwards = false});
+    intaking(-127);
+    pros::delay(300);
+    intaking(127);
+    pros::delay(1000);
+    intakingStore(127);
+    chassis.turnToHeading(180, 500);
+    chassis.turnToPoint(-31, -15, 100);
+    chassis.moveToPoint(-31, 0, 500);
+    chassis.moveToPoint(-31, -15, 1000, {.maxSpeed = 50});
+    pros::delay(2000);
+    chassis.turnToHeading(180, 500);
+    chassis.moveToPoint(-30, 31, 1000, {.forwards = false, .maxSpeed = 80});
+    pros::delay(500);
+    intaking(-127);
+    pros::delay(300);
+    intaking(127);
+    pros::delay(100);
+    toggleDoinker();
+}
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
- */
+void eightBlockL(){
+    intakingStore(127);
+    chassis.turnToPoint(-2, 10, 100);
+    chassis.moveToPoint(-2, 10, 500);
+    chassis.turnToPoint(6, 29, 100); 
+    chassis.moveToPoint(6, 29, 1000, {.maxSpeed = 50});
+    pros::delay(10);
+    chassis.turnToPoint(18, 40, 500);
+    chassis.moveToPoint(18, 40, 500);
+    chassis.turnToHeading(75, 1000);
+    pros::delay(50);
+    toggleDoinker();
+    chassis.moveToPoint(6, 28, 500, {.forwards = false});
+    chassis.turnToHeading(0, 500);
+    chassis.moveToPoint(6, 15, 500, {.forwards = false});
+    chassis.turnToPoint(30, 15, 500);
+    chassis.moveToPoint(30, 15, 500);
+    chassis.turnToHeading(180, 500);
+    chassis.moveToPoint(31, 31, 1000, {.forwards = false});
+    intaking(-127);
+    pros::delay(300);
+    intaking(127);
+    pros::delay(2000);
+    intakingStore(127);
+    chassis.turnToHeading(180, 500);
+    chassis.turnToPoint(31, -15, 100);
+    chassis.moveToPoint(31, 0, 500);
+    chassis.moveToPoint(31, -15, 1000, {.maxSpeed = 50});
+    pros::delay(2000);
+    chassis.turnToHeading(180, 500);
+    chassis.moveToPoint(31, 31, 1000, {.forwards = false});
+    pros::delay(500);
+    toggleDoinker();
+    intaking(-127);
+    pros::delay(300);
+    intaking(127);
+    pros::delay(100);
+}
+
+void skills(){
+    chassis.setPose(0,0,0);
+    chassis.moveToPoint(0, 10, 1000);
+    chassis.turnToPoint(10,10, 1000);
+    chassis.moveToPoint(10, 10, 1000);
+
+}
+
+/*
+██╗███╗   ██╗██╗████████╗██╗ █████╗ ██╗     ██╗███████╗███████╗
+██║████╗  ██║██║╚══██╔══╝██║██╔══██╗██║     ██║╚══███╔╝██╔════╝
+██║██╔██╗ ██║██║   ██║   ██║███████║██║     ██║  ███╔╝ █████╗  
+██║██║╚██╗██║██║   ██║   ██║██╔══██║██║     ██║ ███╔╝  ██╔══╝  
+██║██║ ╚████║██║   ██║   ██║██║  ██║███████╗██║███████╗███████╗
+╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚══════╝
+                                                               
+*/
+
 void on_center_button() {
 	static bool pressed = false;
 	pressed = !pressed;
@@ -343,26 +498,11 @@ void on_center_button() {
 	}
 }
 
-/**
- * Runs initialization code. This occurs as soon as the program is started.
- *
- * All other competition modes are blocked by initialize; it is recommended
- * to keep execution time for this mode under a few seconds.
- */
 void initialize() {
 	pros::lcd::initialize();
 	chassis.calibrate();
     chassis.setPose(0, 0, 0);
     //imu.reset();
-
-
-    // the default rate is 50. however, if you need to change the rate, you
-    // can do the following.
-    // lemlib::bufferedStdout().setRate(...);
-    // If you use bluetooth or a wired connection, you will want to have a rate of 10ms
-
-    // for more information on how the formatting for the loggers
-    // works, refer to the fmtlib docs   
 }
 
 /**
@@ -383,6 +523,16 @@ void disabled() {}
  */
 void competition_initialize() {}
 
+/*
+ █████╗ ██╗   ██╗████████╗ ██████╗ ███╗   ██╗ ██████╗ ███╗   ███╗ ██████╗ ██╗   ██╗███████╗
+██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗████╗  ██║██╔═══██╗████╗ ████║██╔═══██╗██║   ██║██╔════╝
+███████║██║   ██║   ██║   ██║   ██║██╔██╗ ██║██║   ██║██╔████╔██║██║   ██║██║   ██║███████╗
+██╔══██║██║   ██║   ██║   ██║   ██║██║╚██╗██║██║   ██║██║╚██╔╝██║██║   ██║██║   ██║╚════██║
+██║  ██║╚██████╔╝   ██║   ╚██████╔╝██║ ╚████║╚██████╔╝██║ ╚═╝ ██║╚██████╔╝╚██████╔╝███████║
+╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝
+                                                                                           
+*/
+
 /**
  * Runs the user autonomous code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -401,22 +551,32 @@ void autonomous() {
     // 1 = red
     // -1 = blue
 
-    halfWPL();
+    // PID Tuning
     //chassis.turnToHeading(90, 1000);
-
-    //intaking(127);
+    //chassis.moveToPoint(0, 12, 1000);
+    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_BRAKE);
+    skills();
 
     while (true) {    
         lemlib::Pose pose = chassis.getPose();
 
         
-        //chassis.moveToPose(10, 12, 90, 5000);
         pros::lcd::print(6, "IMU: %f", imu.get_heading());
         pros::lcd::print(7, "X: %f, Y: %f\n", pose.x, pose.y);
         pros::delay(20);
     }
-    //chassis.moveToPoint(15, 20, 500, {.forwards = false});
 }
+
+
+/*
+██████╗ ██████╗ ██╗██╗   ██╗███████╗██████╗ 
+██╔══██╗██╔══██╗██║██║   ██║██╔════╝██╔══██╗
+██║  ██║██████╔╝██║██║   ██║█████╗  ██████╔╝
+██║  ██║██╔══██╗██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
+██████╔╝██║  ██║██║ ╚████╔╝ ███████╗██║  ██║
+╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝
+                                            
+*/
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -434,7 +594,8 @@ void autonomous() {
 void opcontrol() {
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
     togglePod();
-
+    chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
+    
 	while (true) {
 
 		// get joystick positions (TANK)
@@ -444,15 +605,24 @@ void opcontrol() {
         // move the chassis with curvature drive
         chassis.tank(leftY, rightY);
         
+        // print heading detected by IMU
         pros::lcd::print(6, "IMU: %f", imu.get_heading());
 
+        // Intake Controls
         if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
+            // outtake top, intake bottom
             intake1.move(127*0.85);
-            intake2.move(-127*0.85);
+            intake2.move(127*0.50);
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+            // outtake both
             intake1.move(-127);
-            intake2.move(127);
+            intake2.move(127*0.80);
+        }
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+            // intake both
+            intake1.move(127*0.85);
+            intake2.move(-127);
         }
         else{
             intake1.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
@@ -460,7 +630,6 @@ void opcontrol() {
             intake2.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
             intake2.brake();
         }
-        
 
         if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)){
             toggleHeight();
@@ -470,7 +639,13 @@ void opcontrol() {
             toggleDoinker();
         }
 
-        
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)){
+            toggleWings();
+        }
+
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)){
+            togglePark();
+        }
 
 		pros::delay(20); 
 	}
