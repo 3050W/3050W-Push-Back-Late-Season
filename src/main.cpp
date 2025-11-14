@@ -399,9 +399,9 @@ void eightBlockM() {
     chassis.turnToPoint(-6, 29, 100); 
     chassis.moveToPoint(-6, 29, 1000, {.maxSpeed = 50});
     pros::delay(10);
-    chassis.turnToPoint(-19, 41, 500);
-    chassis.moveToPoint(-19, 41, 500);
-    chassis.turnToHeading(-70, 1000);
+    chassis.turnToPoint(-25, 46, 500); // 25, 46
+    chassis.moveToPoint(-25, 46, 500);
+    chassis.turnToHeading(-60, 1000);
     pros::delay(50);
     toggleDoinker();
     chassis.moveToPoint(-6, 28, 500, {.forwards = false});
@@ -414,7 +414,7 @@ void eightBlockM() {
     intaking(-127);
     pros::delay(300);
     intaking(127);
-    pros::delay(1000);
+    pros::delay(2000);
     intakingStore(127);
     chassis.turnToHeading(180, 500);
     chassis.turnToPoint(-31, -15, 100);
@@ -471,10 +471,10 @@ void eightBlockL(){
 }
 
 void skills(){
-    chassis.setPose(0,0,0);
-    chassis.moveToPoint(0, 10, 1000);
-    chassis.turnToPoint(10,10, 1000);
-    chassis.moveToPoint(10, 10, 1000);
+    chassis.setPose(-50,-20,90);
+    chassis.moveToPoint(-40, -20, 1000);
+    chassis.turnToPoint(-40,-48, 1000);
+    chassis.moveToPoint(-40, -48, 1000);
 
 }
 
@@ -501,8 +501,6 @@ void on_center_button() {
 void initialize() {
 	pros::lcd::initialize();
 	chassis.calibrate();
-    chassis.setPose(0, 0, 0);
-    //imu.reset();
 }
 
 /**
@@ -554,17 +552,11 @@ void autonomous() {
     // PID Tuning
     //chassis.turnToHeading(90, 1000);
     //chassis.moveToPoint(0, 12, 1000);
+    
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_BRAKE);
     skills();
+    //eightBlockM();
 
-    while (true) {    
-        lemlib::Pose pose = chassis.getPose();
-
-        
-        pros::lcd::print(6, "IMU: %f", imu.get_heading());
-        pros::lcd::print(7, "X: %f, Y: %f\n", pose.x, pose.y);
-        pros::delay(20);
-    }
 }
 
 
@@ -592,10 +584,18 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
     togglePod();
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
-    
+    while (true) {
+            // print robot location to the brain screen
+            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+            // log position telemetry
+            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
+            // delay to save resources
+            pros::delay(50);
+        }
 	while (true) {
 
 		// get joystick positions (TANK)
