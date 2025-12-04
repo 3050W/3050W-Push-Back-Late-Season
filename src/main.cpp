@@ -501,6 +501,7 @@ void on_center_button() {
 void initialize() {
 	pros::lcd::initialize();
 	chassis.calibrate();
+    //skills();
 }
 
 /**
@@ -584,69 +585,54 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-    togglePod();
+    //togglePod();
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
-    while (true) {
-            // print robot location to the brain screen
-            pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-            pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-            pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-            // log position telemetry
-            lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
-            // delay to save resources
-            pros::delay(50);
-        }
-	while (true) {
 
-		// get joystick positions (TANK)
+    while (true) {
+        // print robot position to brain
+        //pros::lcd::print(0, "X: %f", chassis.getPose().x);
+        //pros::lcd::print(1, "Y: %f", chassis.getPose().y);
+        //pros::lcd::print(2, "Theta: %f", chassis.getPose().theta);
+
+        // --- DRIVER CONTROL ---
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int rightY = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
+        printf("left:%d\nright:%d",leftY,rightY);
 
-        // move the chassis with curvature drive
         chassis.tank(leftY, rightY);
-        
-        // print heading detected by IMU
-        pros::lcd::print(6, "IMU: %f", imu.get_heading());
 
-        // Intake Controls
+        // --- INTAKE ---
         if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-            // outtake top, intake bottom
-            intake1.move(127*0.85);
-            intake2.move(127*0.50);
+            intake1.move(108);
+            intake2.move(63);
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-            // outtake both
             intake1.move(-127);
-            intake2.move(127*0.80);
+            intake2.move(102);
         }
         else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-            // intake both
-            intake1.move(127*0.85);
+            intake1.move(108);
             intake2.move(-127);
         }
-        else{
-            intake1.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-            intake1.brake();
-            intake2.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-            intake2.brake();
+        else {
+            intake1.move(0);
+            intake2.move(0);
         }
 
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y)){
+        // ---- TOGGLES ----
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y))
             toggleHeight();
-        }
 
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)){
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT))
             toggleDoinker();
-        }
 
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN)){
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN))
             toggleWings();
-        }
 
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B)){
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B))
             togglePark();
-        }
 
-		pros::delay(20); 
-	}
+        pros::delay(20);
+    }
 }
+
