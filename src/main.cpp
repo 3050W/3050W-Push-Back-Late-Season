@@ -585,7 +585,7 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-    //togglePod();
+    togglePod();
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
 
     while (true) {
